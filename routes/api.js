@@ -1,26 +1,12 @@
 const express = require('express');
 const router = express.Router();
 
-const url = require('url');
 const qs = require('querystring');
 
-const fs = require('fs');
-const path = require('path');
-
-router.get('/stocks', (req, res, next) => {
-    const stream = fs.createReadStream(path.resolve(__dirname, '../mock/sampleQuote.json'));
-    stream.pipe(res);
-});
-
 router.get('/stocks/:id', (req, res, next) => {
-    const id = req.params.id;
-    const q = `select * from yahoo.finance.historicaldata where symbol = "${id}" and startDate = "2016-04-06" and endDate = "2017-04-06"`;
-    const query = {
-        q,
-        format: 'json',
-        env: 'store://datatables.org/alltableswithkeys'
-    }
     const baseUrl = 'https://query.yahooapis.com/v1/public/yql?';
+    const yql = `select * from yahoo.finance.historicaldata where symbol = "${req.params.id}" and startDate = "2016-04-06" and endDate = "2017-04-06"`;
+    const query = { q: yql, format: 'json', env: 'store://datatables.org/alltableswithkeys' };
     const route = baseUrl + qs.stringify(query);
     requestify(route).then(JSON.parse).then(response => {
         const data = [];

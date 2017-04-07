@@ -1,5 +1,5 @@
 let chartData = [];
-const colors = ['#7cb5ec', '#434348', '#90ed7d', '#f7a35c', '#8085e9', '#f15c80', '#e4d354', '#8085e8', '#8d4653', '#91e8e1'];
+const stockQuoteList = document.querySelector('.stock-quote-list');
 const searchContainer = document.querySelector('.search-container');
 const searchInput = document.querySelector('input#tag');
 searchInput.focus();
@@ -11,7 +11,18 @@ function searchInputKeyDownHandler(e) {
     if (e.keyCode === 13) return searchButton.click();
     setTimeout(() => {
         searchInput.value = searchInput.value.toUpperCase();
-    }, 20);
+    }, 1);
+}
+
+function addToStockQuoteList(data) {
+    const div = document.createElement('div');
+    div.style.border = '1px solid black';
+    div.classList.add('stock-quote');
+    const symbol = document.createElement('h4');
+    symbol.style.color = data.color;
+    symbol.textContent = data.name + ' : ' + data.current.toFixed(2);
+    div.appendChild(symbol);
+    stockQuoteList.appendChild(div);
 }
 
 function searchClickHandler(e) {
@@ -26,39 +37,33 @@ function searchClickHandler(e) {
         });
 }
 
+function clearStockQuoteList() {
+    const list = document.querySelectorAll('.stock-quote');
+    list.forEach(item => stockQuoteList.removeChild(item));
+}
+
 function clearChartContainer() {
+    clearStockQuoteList();
     const chart = document.querySelector('#container');
     document.body.removeChild(chart);
     const el = document.createElement('div');
     el.id = 'container';
     document.body.insertBefore(el, searchContainer);
 }
-requestify('/api/stocks', 'GET')
-    .then(JSON.parse)
-    .then(response => {
-        return new Promise((resolve, reject) => {
-            const data = [];
-            response.forEach(item => {
-                const itemData = [Date.parse(item.Date), Number(parseFloat(item.Close).toFixed(2))];
-                data.push(itemData);
-            });
-            resolve(data);
+
+function getYahooQuote() {
+    requestify(`/api/stocks/YHOO`, 'GET')
+        .then(JSON.parse)
+        .then(response => {
+            chartData.push({ name: 'YHOO', data: response });
+            generateChart();
         });
-    }).then(data => {
-        data = data.sort((a, b) => a[0] - b[0]);
-        chartData.push({
-            name: 'YHOO',
-            data
-        });
-        generateChart();
-    });
+}
 
 function generateChart() {
-    let count = 0;
     chartData.forEach(item => {
-        item.color = colors[count];
-        count++;
-        if (count >= 10) count = 0;
+        item.color = `hsl(${Math.floor(Math.random() * 360)}, 50%, 50%)`;
+        addToStockQuoteList({ name: item.name, current: item.data[item.data.length - 1][1], color: item.color });
     });
 
     Highcharts.stockChart('container', {
@@ -108,3 +113,5 @@ function requestify(url, method, data) {
         xhr.send(data);
     })
 }
+
+window.onload = () => getYahooQuote();
