@@ -1,4 +1,5 @@
 let chartData = [];
+const colors = ['#7cb5ec', '#434348', '#90ed7d', '#f7a35c', '#8085e9', '#f15c80', '#e4d354', '#8085e8', '#8d4653', '#91e8e1'];
 const searchContainer = document.querySelector('.search-container');
 const searchInput = document.querySelector('input#tag');
 searchInput.focus();
@@ -16,11 +17,13 @@ function searchInputKeyDownHandler(e) {
 function searchClickHandler(e) {
     const tag = searchInput.value;
     searchInput.value = '';
-    requestify(`/api/stocks/${tag}`, 'GET').then(JSON.parse).then(response => {
-        chartData.push({ name: tag, data: response, tooltip: { valueDecimals: 2 } });
-        clearChartContainer();
-        generateChart(chartData);
-    });
+    requestify(`/api/stocks/${tag}`, 'GET')
+        .then(JSON.parse)
+        .then(response => {
+            chartData.push({ name: tag, data: response });
+            clearChartContainer();
+            generateChart();
+        });
 }
 
 function clearChartContainer() {
@@ -30,36 +33,62 @@ function clearChartContainer() {
     el.id = 'container';
     document.body.insertBefore(el, searchContainer);
 }
-requestify('/api/stocks', 'GET').then(JSON.parse).then(response => {
-    return new Promise((resolve, reject) => {
-        const data = [];
-        response.forEach(item => {
-            const itemData = [Date.parse(item.Date), Number(parseFloat(item.Close).toFixed(2))];
-            data.push(itemData);
+requestify('/api/stocks', 'GET')
+    .then(JSON.parse)
+    .then(response => {
+        return new Promise((resolve, reject) => {
+            const data = [];
+            response.forEach(item => {
+                const itemData = [Date.parse(item.Date), Number(parseFloat(item.Close).toFixed(2))];
+                data.push(itemData);
+            });
+            resolve(data);
         });
-        resolve(data);
+    }).then(data => {
+        data = data.sort((a, b) => a[0] - b[0]);
+        chartData.push({
+            name: 'YHOO',
+            data
+        });
+        generateChart();
     });
-}).then(data => {
-    data = data.sort((a, b) => a[0] - b[0]);
-    chartData.push({
-        name: 'YHOO',
-        data,
-        tooltip: {
-            valueDecimals: 2
-        }
-    });
-    generateChart(chartData);
-});
 
-function generateChart(data) {
+function generateChart() {
+    let count = 0;
+    chartData.forEach(item => {
+        item.color = colors[count];
+        count++;
+        if (count >= 10) count = 0;
+    });
+
     Highcharts.stockChart('container', {
         rangeSelector: {
-            selected: 1
+            selected: 4
         },
-        title: {
-            text: 'Stock Price'
+        yAxis: {
+            labels: {
+                formatter() {
+                    return (this.value > 0 ? ' + ' : '') + this.value + '%';
+                }
+            },
+            plotLines: [{
+                value: 0,
+                width: 2,
+                color: 'silver'
+            }]
         },
-        series: data
+        plotOptions: {
+            series: {
+                compare: 'percent',
+                showInNavigator: true
+            }
+        },
+        tooltip: {
+            pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y}</b> ({point.change}%)<br/>',
+            valueDecimals: 2,
+            split: true
+        },
+        series: chartData
     });
 }
 
