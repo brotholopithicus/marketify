@@ -1,0 +1,52 @@
+const express = require('express');
+const router = express.Router();
+
+const url = require('url');
+const qs = require('querystring');
+
+const fs = require('fs');
+const path = require('path');
+
+router.get('/stocks', (req, res, next) => {
+    const stream = fs.createReadStream(path.resolve(__dirname, '../mock/sampleQuote.json'));
+    stream.pipe(res);
+});
+
+router.get('/stocks/:id', (req, res, next) => {
+    const id = req.params.id;
+    const q = `select * from yahoo.finance.historicaldata where symbol = "${id}" and startDate = "2016-04-06" and endDate = "2017-04-06"`;
+    const query = {
+        q,
+        format: 'json',
+        env: 'store://datatables.org/alltableswithkeys'
+    }
+    const baseUrl = 'https://query.yahooapis.com/v1/public/yql?';
+    const route = baseUrl + qs.stringify(query);
+    requestify(route).then(JSON.parse).then(response => {
+        const data = [];
+        response.query.results.quote.forEach(quote => {
+            const dataItem = [Date.parse(quote.Date), Number(quote.Close)];
+            data.push(dataItem);
+        });
+        const sortedData = data.sort((a, b) => a[0] - b[0]);
+        return res.json(sortedData);
+    });
+});
+
+function requestify(config, data) {
+    if (typeof config === 'string') config = require('url').parse(config);
+    return new Promise((resolve, reject) => {
+        const protocol = config.protocol === 'https:' ? require('https') : require('http');
+        const req = protocol.request(config, (res) => {
+            if (res.statusCode < 200 || res.statusCode > 299) return reject(new Error(`Request Failed: StatusCode = ${res.statusCode}`));
+            const body = [];
+            res.on('data', (chunk) => body.push(chunk));
+            res.on('end', () => resolve(body.join('')));
+        });
+        req.on('error', (err) => reject(err));
+        if (data) req.write(data);
+        req.end();
+    });
+}
+
+module.exports = router;
